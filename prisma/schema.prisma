@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Analysis {
+  id                 String   @id @default(cuid())
+  title              String
+  projectType        String
+  horizon            String
+  depth              String
+  projectDescription String
+  report             String
+  score              Int?
+  verdict            String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now())
+  // User enrichment (edit #4)
+  tags               String?  // JSON array of strings, e.g. ["urgente","fintech"]
+  notes              String?  // free-form user notes
+  // Sharing (#8)
+  shareToken         String?  @unique
+  isPublic           Boolean  @default(false)
+  // Reminders (#9)
+  reminderAt         DateTime?
+  reminderSeen       Boolean  @default(false)
+  // Versioning (#12) — links a re-analysis to its predecessor
+  parentAnalysisId   String?
+  // Language the report was generated in (#11)
+  language           String?  // "es" | "en"
+}
