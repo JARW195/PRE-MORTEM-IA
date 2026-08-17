@@ -15,6 +15,9 @@
 //   - Images: .png .jpg .jpeg .gif .webp .svg (noted, not OCR'd)
 //   - Other: noted as "no procesable"
 
+// IMPORTANT: this import must happen before "pdf-parse" itself — it sets up
+// the CanvasFactory / DOMMatrix polyfills pdfjs-dist needs on Node.js.
+import { CanvasFactory } from "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
@@ -126,7 +129,7 @@ async function extractTextFile(bytes: Uint8Array): Promise<string> {
 }
 
 async function extractPdf(bytes: Uint8Array): Promise<string> {
-  const parser = new PDFParse({ data: bytes });
+  const parser = new PDFParse({ data: bytes, CanvasFactory });
   const result = await parser.getText();
   return result?.text ?? "";
 }
