@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import {
@@ -129,7 +129,7 @@ async function runJobInBackground(
   jobId: string,
   input: ParsedInput
 ): Promise<void> {
-  updateJob(jobId, { status: "running", startedAt: Date.now() });
+  await updateJob(jobId, { status: "running", startedAt: Date.now() });
   try {
     const {
       projectDescription,
@@ -141,7 +141,7 @@ async function runJobInBackground(
     } = input;
 
     // Phase 1: extract files (if any)
-    setJobPhase(
+    await setJobPhase(
       jobId,
       "extracting",
       files && files.length > 0
@@ -195,14 +195,14 @@ async function runJobInBackground(
     };
 
     // Phase 2: LLM generation (the long part)
-    setJobPhase(jobId, "generating", "El equipo virtual está atacando el proyecto…");
+    await setJobPhase(jobId, "generating", "El equipo virtual está atacando el proyecto…");
     const report = await runPremortem(request);
     const score = extractScore(report);
     const verdict = extractVerdict(report);
     const title = deriveTitle(projectDescription);
 
     // Phase 3: persisting
-    setJobPhase(jobId, "saving", "Guardando el análisis…");
+    await setJobPhase(jobId, "saving", "Guardando el análisis…");
     let savedId: string | null = null;
     try {
       const created = await db.analysis.create({
@@ -223,8 +223,8 @@ async function runJobInBackground(
       // best-effort persistence
     }
 
-    setJobPhase(jobId, "finished");
-    updateJob(jobId, {
+    await setJobPhase(jobId, "finished");
+    await updateJob(jobId, {
       status: "done",
       result: {
         id: savedId,
@@ -241,7 +241,7 @@ async function runJobInBackground(
       },
     });
   } catch (err) {
-    updateJob(jobId, {
+    await updateJob(jobId, {
       status: "error",
       error:
         err instanceof Error ? err.message : "Error desconocido al generar el análisis.",
@@ -305,14 +305,21 @@ export async function POST(req: Request) {
   // Start the analysis in the background and return a job id immediately.
   // This prevents the gateway from cutting off long-lived requests with 502.
   const jobId = randomUUID();
-  createJob(jobId);
+  await createJob(jobId);
 
-  // Fire-and-forget: the promise runs detached from this request.
-  void runJobInBackground(jobId, parsed.input).catch(() => {
-    updateJob(jobId, {
-      status: "error",
-      error: "Error inesperado al iniciar el análisis.",
-    });
+  // Run the analysis after the response has been sent. On Vercel, code does
+  // NOT keep running in the background after a normal response is returned
+  // (the function is frozen/torn down) — after() is what keeps this alive
+  // for up to `maxDuration` so the job can actually finish.
+  after(async () => {
+    try {
+      await runJobInBackground(jobId, parsed.input);
+    } catch {
+      await updateJob(jobId, {
+        status: "error",
+        error: "Error inesperado al iniciar el análisis.",
+      });
+    }
   });
 
   return NextResponse.json({ jobId, status: "pending" });

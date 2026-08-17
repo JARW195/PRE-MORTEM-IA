@@ -17,7 +17,7 @@ export async function GET(
   ctx: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await ctx.params;
-  const job = getJob(jobId);
+  const job = await getJob(jobId);
   if (!job) {
     return NextResponse.json(
       { error: "Trabajo no encontrado o expirado." },

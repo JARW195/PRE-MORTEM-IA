@@ -28,6 +28,20 @@ model Post {
   updatedAt DateTime @updatedAt
 }
 
+model Job {
+  id           String    @id @default(cuid())
+  status       String    @default("pending")
+  phase        String    @default("queued")
+  phaseMessage String?
+  startedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  result       Json?
+  error        String?
+
+  @@index([updatedAt])
+}
+
 model Analysis {
   id                 String   @id @default(cuid())
   title              String
