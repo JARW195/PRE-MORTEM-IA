@@ -67,4 +67,5 @@ model Analysis {
   parentAnalysisId   String?
   // Language the report was generated in (#11)
   language           String?  // "es" | "en"
+  actionPlan         String?  // Generated on demand from section 14 ("Plan de Acción")
 }

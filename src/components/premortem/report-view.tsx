@@ -12,7 +12,10 @@ import {
   FileDown,
   FileSpreadsheet,
   Link2,
+  ListChecks,
+  Loader2,
   Pencil,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
   X,
@@ -75,6 +78,97 @@ export function ReportView({
   const [editing, setEditing] = React.useState(false);
   const [editTitle, setEditTitle] = React.useState("");
   const [reminderOpen, setReminderOpen] = React.useState(false);
+
+  // #14 — "Plan de Acción" follow-up
+  const [actionPlan, setActionPlan] = React.useState<string | null>(
+    result?.actionPlan ?? null
+  );
+  const [actionPlanLoading, setActionPlanLoading] = React.useState(false);
+  const [actionPlanError, setActionPlanError] = React.useState<string | null>(null);
+
+  // Reset local action-plan state whenever the displayed analysis changes
+  // (adjust state during render instead of an effect, per React's guidance
+  // for resetting state when a prop changes).
+  const [lastResultId, setLastResultId] = React.useState(result?.id);
+  if (result?.id !== lastResultId) {
+    setLastResultId(result?.id);
+    setActionPlan(result?.actionPlan ?? null);
+    setActionPlanError(null);
+    setActionPlanLoading(false);
+  }
+
+  async function generateActionPlan(force = false) {
+    if (!result?.id) return;
+    setActionPlanLoading(true);
+    setActionPlanError(null);
+    try {
+      const res = await fetch(
+        `/api/analyses/${result.id}/action-plan${force ? "?force=1" : ""}`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status}`);
+      }
+      if (data.status === "done" && data.actionPlan) {
+        setActionPlan(data.actionPlan);
+        setActionPlanLoading(false);
+        return;
+      }
+      const jobId = data.jobId;
+      if (!jobId) {
+        throw new Error("El servidor no devolvió un identificador de trabajo.");
+      }
+
+      const maxWaitMs = 3 * 60 * 1000;
+      const startedAt = Date.now();
+      while (true) {
+        if (Date.now() - startedAt > maxWaitMs) {
+          throw new Error(
+            "El plan de acción tardó demasiado en generarse. Intenta nuevamente."
+          );
+        }
+        await new Promise((r) => setTimeout(r, 2500));
+        let pollRes: Response;
+        try {
+          pollRes = await fetch(`/api/analyses/${result.id}/action-plan/${jobId}`, {
+            cache: "no-store",
+          });
+        } catch {
+          continue;
+        }
+        if (!pollRes.ok) {
+          if (pollRes.status === 404) {
+            throw new Error("El trabajo expiró o no se encontró. Intenta nuevamente.");
+          }
+          continue;
+        }
+        const pollData = await pollRes.json().catch(() => null);
+        if (pollData?.status === "done" && pollData.actionPlan) {
+          setActionPlan(pollData.actionPlan);
+          setActionPlanLoading(false);
+          toast.success("Plan de acción generado");
+          return;
+        }
+        if (pollData?.status === "error") {
+          throw new Error(pollData.error || "Error desconocido al generar el plan.");
+        }
+        // "pending" | "running" → keep polling
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "No se pudo generar el plan de acción.";
+      setActionPlanError(message);
+      setActionPlanLoading(false);
+      toast.error("Falló la generación del plan", { description: message });
+    }
+  }
+
+  function copyActionPlan() {
+    if (!actionPlan) return;
+    navigator.clipboard.writeText(actionPlan).catch(() => {});
+    toast.success("Plan de acción copiado");
+  }
 
   async function copyReport() {
     if (!result) return;
@@ -387,6 +481,82 @@ export function ReportView({
       <article className="premortem-report">
         <Markdown content={result.report} />
       </article>
+
+      {/* #14 follow-up — Plan de Acción */}
+      <div className="mt-8 rounded-xl border border-amber-500/30 bg-amber-500/[0.03] p-5">
+        {!actionPlan && !actionPlanLoading && (
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 font-semibold text-foreground">
+                <ListChecks className="size-4 text-amber-400" />
+                ¿Convertimos esto en un Plan de Acción?
+              </p>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                Genera un plan concreto y priorizado que incorpora todas las
+                defensas y elimina las vulnerabilidades detectadas en el
+                informe.
+              </p>
+            </div>
+            <Button
+              onClick={() => generateActionPlan(false)}
+              disabled={!hasId}
+              className="shrink-0 bg-gradient-to-r from-amber-500 to-red-600 text-white hover:from-amber-600 hover:to-red-700"
+            >
+              <ListChecks className="size-4" />
+              Generar Plan de Acción
+            </Button>
+          </div>
+        )}
+
+        {actionPlanLoading && (
+          <div className="flex items-center gap-3 py-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin text-amber-400" />
+            Generando el plan de acción… puede tardar hasta un minuto.
+          </div>
+        )}
+
+        {actionPlanError && !actionPlanLoading && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm text-red-400">{actionPlanError}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => generateActionPlan(false)}
+            >
+              <RotateCcw className="size-3.5" />
+              Reintentar
+            </Button>
+          </div>
+        )}
+
+        {actionPlan && !actionPlanLoading && (
+          <div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 font-semibold text-foreground">
+                <ListChecks className="size-4 text-amber-400" />
+                Plan de Acción
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={copyActionPlan}>
+                  <Copy className="size-3.5" />
+                  Copiar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => generateActionPlan(true)}
+                >
+                  <RefreshCw className="size-3.5" />
+                  Regenerar
+                </Button>
+              </div>
+            </div>
+            <article className="premortem-report">
+              <Markdown content={actionPlan} />
+            </article>
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }

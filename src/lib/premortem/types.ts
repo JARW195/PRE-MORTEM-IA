@@ -31,6 +31,7 @@ export interface PremortemResult {
   depth: string;
   projectDescription: string;
   createdAt: string;
+  actionPlan?: string | null;
 }
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {

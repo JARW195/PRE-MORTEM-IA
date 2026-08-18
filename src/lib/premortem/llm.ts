@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 import { buildSystemPrompt } from "./system-prompt";
+import {
+  ACTION_PLAN_SYSTEM_PROMPT,
+  buildActionPlanUserMessage,
+} from "./action-plan-prompt";
 import type { PremortemRequest } from "./types";
 
 /**
@@ -147,6 +151,58 @@ export async function runPremortem(
         continue;
       }
       // Non-transient error or out of retries — break and throw.
+      break;
+    }
+  }
+
+  const msg =
+    lastError instanceof Error ? lastError.message : "Error desconocido del modelo.";
+  throw new Error(msg);
+}
+
+/**
+ * Converts an already-generated pre-mortem report into a corrected,
+ * executable action plan (section 14 follow-up). Same retry policy as
+ * runPremortem.
+ */
+export async function runActionPlan(opts: {
+  projectDescription: string;
+  originalReport: string;
+}): Promise<string> {
+  const userMessage = buildActionPlanUserMessage(opts);
+
+  const MAX_ATTEMPTS = 3;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const client = getClient();
+
+      const completion = await client.chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          { role: "system", content: ACTION_PLAN_SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+      });
+
+      const content: string | undefined =
+        completion?.choices?.[0]?.message?.content ?? undefined;
+      if (!content || !content.trim()) {
+        throw new Error("El modelo no devolvió contenido.");
+      }
+
+      return content.trim();
+    } catch (err) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const isTransient = isTransientError(msg);
+
+      if (attempt < MAX_ATTEMPTS && isTransient) {
+        const delayMs = 3000 * Math.pow(2, attempt - 1);
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
       break;
     }
   }
