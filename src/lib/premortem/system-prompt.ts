@@ -15,6 +15,35 @@ import {
  *
  * ISO-aware: the applicable standards are injected per project type, and the
  * Compliance & Reputation expert evaluates conformance gaps for each.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ESTRUCTURA (INSTRUCCIONES) — mapeo al marco "Cómo trabajar mejor con IA":
+ *
+ * Esta carpeta (`src/lib/premortem/`) ES la carpeta 01·INSTRUCCIONES del
+ * modelo de 5 carpetas: contiene el "qué queremos hacer y cuáles son las
+ * reglas", separada de 02·ORIGINAL (`Analysis.projectDescription`, nunca se
+ * modifica), 03·TRABAJO (tabla `Job` / `job-store.ts`, en progreso) y
+ * 04·RESULTADOS (`Analysis.report/.score/.verdict/.actionPlan`).
+ *
+ * Este prompt responde las 6 preguntas del "prompt base" explícitamente:
+ *   1. ¿Qué quiero?          → CICLO PRE-MORTEM (comprender → atacar)
+ *   2. ¿Qué tiene que saber? → contexto inyectado por llm.ts::buildUserMessage
+ *      (solo la descripción del proyecto + contexto puntual — nunca el
+ *      historial completo de análisis anteriores: la "mesa de trabajo" se
+ *      mantiene despejada, ver `slide 07` de la guía).
+ *   3. ¿Qué quiero que haga? → EQUIPO VIRTUAL (roles) + MATRIZ DE RIESGO
+ *   4. ¿Qué no debe hacer?   → REGLAS ABSOLUTAS (20 reglas)
+ *   5. ¿Cómo el resultado?   → FORMATO OBLIGATORIO (al final del archivo)
+ *   6. ¿Cómo se revisa?      → ÍNDICE DE PREPARACIÓN + extractScore/
+ *      extractVerdict en llm.ts (criterio de revisión automatizable)
+ *
+ * Ciclo EVALUAR → ORIENTAR → ACCIONAR → AJUSTAR:
+ *   EVALUAR/ORIENTAR = este prompt (diagnóstico + priorización de riesgos)
+ *   ACCIONAR         = fases del Job: extracting → generating → saving
+ *   AJUSTAR          = `action-plan-prompt.ts` (sección 14, bajo demanda) —
+ *                       convierte el diagnóstico en un plan corregido y
+ *                       ejecutable, cerrando el ciclo.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 const DEPTH_INSTRUCTIONS: Record<Depth, string> = {

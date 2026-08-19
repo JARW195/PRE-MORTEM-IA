@@ -5,6 +5,18 @@
  * the main pre-mortem report: it takes an already-generated adversarial
  * analysis and converts it into a corrected, executable action plan that
  * incorporates every defense and eliminates the detected vulnerabilities.
+ *
+ * Dentro del ciclo EVALUAR → ORIENTAR → ACCIONAR → AJUSTAR (marco "Cómo
+ * trabajar mejor con IA"), este archivo ES el paso AJUSTAR: toma el
+ * resultado ya evaluado (el informe de `system-prompt.ts`) y lo convierte en
+ * reglas/acciones concretas para la próxima iteración del proyecto — el
+ * mismo rol que cumple "revisar el resultado y mejorar las reglas" en el
+ * ejemplo del ciclo con Excel de la guía.
+ *
+ * Respeta la "mesa de trabajo" despejada (slide 07): el mensaje que arma
+ * `buildActionPlanUserMessage` solo incluye la descripción original del
+ * proyecto y el informe ya generado — no reprocesa archivos adjuntos ni
+ * historial de otros análisis.
  */
 
 export const ACTION_PLAN_SYSTEM_PROMPT = `Eres el mismo equipo virtual de PRE-MORTEM IA, pero ahora en modo CONSTRUCCIÓN en vez de modo ATAQUE.
