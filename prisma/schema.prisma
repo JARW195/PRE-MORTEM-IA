@@ -68,4 +68,7 @@ model Analysis {
   // Language the report was generated in (#11)
   language           String?  // "es" | "en"
   actionPlan         String?  // Generated on demand from section 14 ("Plan de Acción")
+  archived           Boolean  @default(false) // 05·HISTÓRICO — fuera de la "mesa de trabajo" por defecto
+
+  @@index([archived])
 }

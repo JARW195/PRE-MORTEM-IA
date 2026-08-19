@@ -82,7 +82,7 @@ export default function Home() {
   const loadHistory = React.useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch("/api/analyses", { cache: "no-store" });
+      const res = await fetch("/api/analyses?includeArchived=1", { cache: "no-store" });
       const data = await res.json();
       if (data.analyses) {
         setHistory(data.analyses);
@@ -360,10 +360,10 @@ export default function Home() {
     setJobMessage(null);
   }
 
-  // #4 — edit title/tags
+  // #4 — edit title/tags/notes; archived (05·HISTÓRICO)
   async function handleEdit(
     id: string,
-    patch: { title?: string; tags?: string[]; notes?: string }
+    patch: { title?: string; tags?: string[]; notes?: string; archived?: boolean }
   ) {
     const res = await fetch(`/api/analyses/${id}/edit`, {
       method: "PUT",
@@ -378,12 +378,17 @@ export default function Home() {
     setHistory((prev) =>
       prev.map((h) =>
         h.id === id
-          ? { ...h, title: updated.title, tags: JSON.stringify(updated.tags) }
+          ? {
+              ...h,
+              title: updated.title,
+              tags: JSON.stringify(updated.tags),
+              archived: updated.archived,
+            }
           : h
       )
     );
     if (result?.id === id) {
-      setResult((r) => (r ? { ...r, title: updated.title } : r));
+      setResult((r) => (r ? { ...r, title: updated.title, archived: updated.archived } : r));
     }
   }
 

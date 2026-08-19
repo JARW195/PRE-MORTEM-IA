@@ -3,8 +3,11 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  Archive,
+  ArchiveRestore,
   Clock,
   FileText,
+  ListChecks,
   Pencil,
   Search,
   Tag,
@@ -35,7 +38,10 @@ interface HistoryPanelProps {
   onSelect: (item: PremortemResult) => void;
   onDelete: (id: string) => void;
   onClear: () => void;
-  onEdit: (id: string, patch: { title?: string; tags?: string[]; notes?: string }) => Promise<void>;
+  onEdit: (
+    id: string,
+    patch: { title?: string; tags?: string[]; notes?: string; archived?: boolean }
+  ) => Promise<void>;
 }
 
 type SortKey = "recent" | "score-asc" | "score-desc" | "title";
@@ -97,10 +103,29 @@ export function HistoryPanel({
   const [editTitle, setEditTitle] = React.useState("");
   const [editTags, setEditTags] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  // 05·HISTÓRICO — por defecto la "mesa de trabajo" solo muestra activos.
+  const [showArchived, setShowArchived] = React.useState(false);
+  const [archivingId, setArchivingId] = React.useState<string | null>(null);
+
+  const archivedCount = React.useMemo(
+    () => items.filter((it) => (it as PremortemResult).archived).length,
+    [items]
+  );
+
+  async function toggleArchived(item: PremortemResult, e: React.SyntheticEvent) {
+    e.stopPropagation();
+    setArchivingId(item.id);
+    try {
+      await onEdit(item.id, { archived: !item.archived });
+    } finally {
+      setArchivingId(null);
+    }
+  }
 
   // Filter + sort
   const filtered = React.useMemo(() => {
     let list = items;
+    list = list.filter((it) => Boolean((it as PremortemResult).archived) === showArchived);
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -135,7 +160,7 @@ export function HistoryPanel({
         );
     }
     return sorted;
-  }, [items, query, filterVerdict, sortKey]);
+  }, [items, query, filterVerdict, sortKey, showArchived]);
 
   function startEdit(item: PremortemResult) {
     setEditingId(item.id);
@@ -175,18 +200,41 @@ export function HistoryPanel({
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-2">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Historial ({filtered.length}
+          {showArchived ? "Archivados" : "Historial"} ({filtered.length}
           {filtered.length !== items.length ? `/${items.length}` : ""})
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClear}
-          className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-red-400"
-        >
-          <Trash2 className="size-3" />
-          Limpiar
-        </Button>
+        <div className="flex items-center gap-1">
+          {archivedCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowArchived((v) => !v)}
+              className={cn(
+                "h-7 gap-1 px-2 text-xs",
+                showArchived
+                  ? "text-amber-400 hover:text-amber-300"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title={
+                showArchived
+                  ? "Volver a los análisis activos"
+                  : `Ver ${archivedCount} archivado${archivedCount === 1 ? "" : "s"} (05·HISTÓRICO)`
+              }
+            >
+              {showArchived ? <ArchiveRestore className="size-3" /> : <Archive className="size-3" />}
+              {showArchived ? "Activos" : `Archivados (${archivedCount})`}
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClear}
+            className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-red-400"
+          >
+            <Trash2 className="size-3" />
+            Limpiar
+          </Button>
+        </div>
       </div>
 
       {/* Search + filters */}
@@ -356,6 +404,15 @@ export function HistoryPanel({
                               </span>
                             )}
                             {verdictBadge(item.verdict)}
+                            {item.hasActionPlan && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[0.6rem] text-emerald-400"
+                                title="Plan de Acción generado (ciclo: Ajustar)"
+                              >
+                                <ListChecks className="size-2.5" />
+                                Plan ✓
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="mt-1.5 flex items-center justify-between">
@@ -369,6 +426,33 @@ export function HistoryPanel({
                             })}
                           </span>
                           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => toggleArchived(item, e)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleArchived(item, e);
+                                }
+                              }}
+                              className={cn(
+                                "text-muted-foreground hover:text-amber-400",
+                                archivingId === item.id && "opacity-50"
+                              )}
+                              aria-label={showArchived ? "Desarchivar análisis" : "Archivar análisis"}
+                              title={
+                                showArchived
+                                  ? "Volver a la mesa de trabajo"
+                                  : "Archivar (05·HISTÓRICO)"
+                              }
+                            >
+                              {showArchived ? (
+                                <ArchiveRestore className="size-3.5" />
+                              ) : (
+                                <Archive className="size-3.5" />
+                              )}
+                            </span>
                             <span
                               role="button"
                               tabIndex={0}
