@@ -47,13 +47,19 @@ export default function VideoPage() {
           </video>
         </div>
 
-        <div className="mt-6 flex justify-center sm:justify-start">
+        <div className="mt-6 flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/"
             className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-amber-500 to-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-500/20 transition-transform hover:scale-[1.02]"
           >
             Probar PRE-MORTEM IA
           </Link>
+          <p className="text-sm text-muted-foreground">
+            Aplicación creada por{" "}
+            <span className="font-medium text-foreground">
+              Johnathan Alexander Richardson Witt
+            </span>
+          </p>
         </div>
       </div>
     </main>
